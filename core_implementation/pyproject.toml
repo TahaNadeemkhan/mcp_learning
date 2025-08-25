@@ -5,6 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aioconsole>=0.8.1",
+    "anthropic>=0.64.0",
     "mcp[cli]>=1.13.0",
     "pydantic>=2.7,<3",
     "pydantic-core>=2.33.2",

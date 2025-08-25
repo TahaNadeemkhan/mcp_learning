@@ -1,3 +1,4 @@
+import base64
 from pydoc import doc
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
@@ -34,6 +35,19 @@ def read_doc(doc_id: str):
     else:
         raise mcp.ResourceNotFound(f"Document '{doc_id}' not found.")
 
+@mcp.resource("binary://logo", mime_type="image/png")
+def get_logo():
+    try:
+        with open("logo.png", "rb") as f:
+            data = f.read()
+        encoded = base64.b64encode(data).decode("utf-8")
+        return {"file name": "logo.png", "data": encoded}
+    except:
+        raise mcp.ResourceNotFound("logo file not found.")
+    
+@mcp.prompt(name="custom prompt", title="My prompt", description="Prompt for the guidance of the user")
+def get_prompt(user_name: str):
+    return f"Hello {user_name}"
 
 
 mcp_server = mcp.streamable_http_app()

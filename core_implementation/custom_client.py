@@ -1,37 +1,88 @@
 import asyncio
-from contextlib import asynccontextmanager
-from contextlib import AsyncExitStack
+from json import load
+from anthropic import AsyncAnthropic
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+from mcp.client.session import RequestContext
+from mcp.types import (
+    CreateMessageRequestParams,
+    CreateMessageResult,
+    TextContent,
+    SamplingMessage,
+)
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+anthropic_client = AsyncAnthropic()
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+model = "gemini-2.0-flash"
+
+server_params = StdioServerParameters(
+    command="uv",
+    args=["run", "server.py"],
+)
 
 
+async def chat(input_messages: list[SamplingMessage], max_tokens=4000):
+    messages = []
+    for msg in input_messages:
+        if msg.role == "user" and msg.content.type == "text":
+            content = (
+                msg.content.text
+                if hasattr(msg.content, "text")
+                else str(msg.content)
+            )
+            messages.append({"role": "user", "content": content})
+        elif msg.role == "assistant" and msg.content.type == "text":
+            content = (
+                msg.content.text
+                if hasattr(msg.content, "text")
+                else str(msg.content)
+            )
+            messages.append({"role": "assistant", "content": content})
 
-# @asynccontextmanager
-# async def make_connection(name):
-#     print(f"Making connection... {name}")
-#     yield name
-#     print(f"Connected {name}!")
+    response = await anthropic_client.messages.create(
+        model=model,
+        messages=messages,
+        max_tokens=max_tokens,
+    )
+
+    text = "".join([p.text for p in response.content if p.type == "text"])
+    return text
 
 
-# async def main():
-#     async with make_connection("My connection") as connection:
-#         print("Using conencion", {connection})
-#         await asyncio.sleep(1)
+async def sampling_callback(
+    context: RequestContext, params: CreateMessageRequestParams
+):
+    # Call Claude using the Anthropic SDK
+    text = await chat(params.messages)
+
+    return CreateMessageResult(
+        role="assistant",
+        model=model,
+        content=TextContent(type="text", text=text),
+    )
 
 
+async def run():
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(
+            read, write, sampling_callback=sampling_callback
+        ) as session:
+            await session.initialize()
 
-async def make_connection(name):
-    class Ctx():
-        async def __aenter__(self):
-            print(f"Connecting...{name}")
-            return name
-        async def __aexit__(self, *args):
-            print(f"Connected...{name}")
-    return Ctx()
+            result = await session.call_tool(
+                name="summarize",
+                arguments={"text_to_summarize": "lots of text"},
+            )
+            print(result.content)
 
-async def main():
-    async with AsyncExitStack() as stack:   
-            a = await stack.enter_async_context(await make_connection("A"))
-            b = await stack.enter_async_context(await make_connection("B"))
-            print(f"Making connection of {a} and {b}...")
-        
 
-asyncio.run(main())
+if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(run())
