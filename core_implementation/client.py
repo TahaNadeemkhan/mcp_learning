@@ -1,5 +1,3 @@
-from importlib import resources
-from importlib.abc import ResourceReader
 from mcp import ClientSession, types
 from mcp.client.streamable_http import streamablehttp_client
 import asyncio
@@ -44,6 +42,11 @@ class MCPClient:
         result: types.ListResourcesResult = await self._sess.list_resources()
         return result.resources
         
+    async def list_resource_templates(self) -> types.ListResourceTemplatesResult:
+        assert self._sess, "Session not available"
+        result: types.ListResourceTemplatesResult = await self._sess.list_resource_templates()
+        return result.resourceTemplates
+
     async def read_resources(self, uris: list[str]) -> types.ReadResourceResult:
         assert self._sess, "Session not available"
         result =  await self._sess.read_resource(AnyUrl(uris))
@@ -55,12 +58,8 @@ class MCPClient:
                 except json.JSONDecodeError:
                     raise ValueError(f"Failed to decode JSON from resource: {resource.text}")
         return resource.text
-        
     
-
-    # async def list_resource_templates() -> types.ListResourceTemplatesResult:
-    #     assert self._sess, "Session not available"
-    #     result = 
+    
     
     # async def read_resource(self, uri: str):
     #     return await self._sess.read_resource(uri)
@@ -71,11 +70,15 @@ async def main():
         # tools = await client.list_tools()
         # # print("Tools:", tools)
        
-       resources = await client.list_resources()
-       print("Resources:", resources[0].uri)
+        data = await client.read_resources("binary://logo")
+        print("First 100 chars of base64:", data[:100])
 
-       data = await client.read_resources("docs://documents")
-       print("Data: ", str(data))
+    #    resources = await client.list_resource_templates()
+    #    intro_template = print("Resource Templates:", resources[0].uriTemplate.replace("{doc_id}", "deposition.md"))
+    #    print(intro_template)
+
+    #    data = await client.read_resources("docs://documents")
+    #    print("Data: ", str(data))
     #    for r in resources:
     #        data = await client.read_resources(r.uri)
     #        print(f"Resource {r.uri} contents:", data)
